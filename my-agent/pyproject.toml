@@ -1,0 +1,16 @@
+[project]
+name = "my-deep-agent"
+version = "0.1.0"
+description = "A local command-line agent built with Deep Agents."
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "deepagents",
+    "langchain-openai>=1.1.14,<2.0.0",
+    "python-dotenv>=1.0.0,<2.0.0",
+]
+
+[dependency-groups]
+dev = ["ipykernel>=6.29,<8.0"]
+
+[tool.uv.sources]
+deepagents = { path = "../libs/deepagents", editable = true }
