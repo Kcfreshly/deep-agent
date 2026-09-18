@@ -2,6 +2,14 @@
 
 # Changelog
 
+## [0.0.12](https://github.com/Kcfreshly/deep-agent/compare/deepagents-acp==0.0.11...deepagents-acp==0.0.12) (2026-09-18)
+
+
+### Features
+
+* **acp:** stream visible reasoning as thought chunks ([#5880](https://github.com/Kcfreshly/deep-agent/issues/5880)) ([7e96bf0](https://github.com/Kcfreshly/deep-agent/commit/7e96bf0ab1494217251010a30d27198d0c9532c9))
+* **acp:** support persistent session loading ([#5365](https://github.com/Kcfreshly/deep-agent/issues/5365)) ([aaefb1e](https://github.com/Kcfreshly/deep-agent/commit/aaefb1eea1652abf370b5ac699be8307aee979e5))
+
 ## [0.0.11](https://github.com/langchain-ai/deepagents/compare/deepagents-acp==0.0.10...deepagents-acp==0.0.11) (2026-08-27)
 
 ### Features
