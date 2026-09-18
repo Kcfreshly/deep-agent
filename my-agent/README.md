@@ -32,7 +32,7 @@ You can also provide the first message directly:
 uv run agent.py "Start interview mode"
 ```
 
-The default is `deepseek:deepseek-v4-flash`. Set `DEEP_AGENT_MODEL` in `.env` or pass `--model provider:model` to select another supported model. DeepSeek requires `DEEPSEEK_API_KEY`. Set `OPENAI_API_KEY` to let DeepSeek call OpenAI hosted web search as a function tool. The search model defaults to the small `gpt-5.6-luna`; override it with `OPENAI_SEARCH_MODEL`. `TAVILY_API_KEY` remains an optional fallback search provider.
+The default is `deepseek:deepseek-v4-flash`. Set `DEEP_AGENT_MODEL` in `.env` or pass `--model provider:model` to select another supported model. DeepSeek requires `DEEPSEEK_API_KEY`. If `OPENAI_API_KEY` is set, OpenAI is used for hosted web search when requested and for extracting relevant text from PDFs read by the agent; ordinary advisory turns still use DeepSeek. The search model defaults to `gpt-5.6-luna` and can be changed with `OPENAI_SEARCH_MODEL`; PDF extraction defaults to `gpt-5.6-luna` and can be changed with `OPENAI_PDF_MODEL`. `TAVILY_API_KEY` remains an optional fallback search provider.
 
 ## Run in Jupyter
 
@@ -42,6 +42,6 @@ Open `Untitled.ipynb`, select the `Python 3 (my-deep-agent)` kernel, restart the
 
 - Markdown memory remains under `memory/` and is ignored by Git.
 - The agent's filesystem backend cannot access `.env`; it is routed only to `memory/`.
-- With the default configuration, prompts are sent to DeepSeek. OpenAI is contacted only when `OPENAI_API_KEY` is configured and the model calls the `internet_search` tool, or when an `openai:<model>` model is selected. Search queries are sent to Tavily only if `OPENAI_API_KEY` is absent and `TAVILY_API_KEY` is configured.
+- With the default configuration, advisory prompts are sent to DeepSeek. OpenAI is contacted only when `OPENAI_API_KEY` is configured and the agent searches the web or reads a PDF. For PDF reads, only the PDF and the current question are sent to OpenAI; extracted text is passed to DeepSeek, not the PDF block. Without an OpenAI key, the middleware replaces the PDF block with an explanation instead of sending an unsupported attachment to DeepSeek. Search queries go to Tavily only if `OPENAI_API_KEY` is absent and `TAVILY_API_KEY` is configured.
 - LangSmith tracing is disabled by default because the profile can contain sensitive personal information. Set `ADVISOR_ENABLE_TRACING=true` only if the user understands and accepts tracing.
 - Do not provide or store passport/UCI/account numbers, credentials, raw bank records, or raw medical/criminal records.

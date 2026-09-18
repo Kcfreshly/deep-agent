@@ -8,6 +8,8 @@ import unittest
 from unittest.mock import patch
 
 from deepagents.backends import CompositeBackend, FilesystemBackend, StateBackend
+from langchain.agents.middleware import ModelRequest
+from langchain_core.messages import HumanMessage, ToolMessage
 
 import advisor
 
@@ -82,8 +84,149 @@ class AdvisorConfigurationTests(unittest.TestCase):
 
         subagents = create.call_args.kwargs["subagents"]
         self.assertTrue(
-            all(subagent["tools"] == [advisor.internet_search] for subagent in subagents)
+            all(
+                subagent["tools"] == [advisor.internet_search] for subagent in subagents
+            )
         )
+
+    def test_pdf_middleware_is_attached_to_coordinator_and_specialists(self) -> None:
+        """All agents that can read files should get the PDF-only fallback."""
+        with patch.object(
+            advisor, "create_deep_agent", return_value=object()
+        ) as create:
+            advisor.create_advisory_agent("openai:test-model")
+
+        options = create.call_args.kwargs
+        self.assertTrue(
+            any(
+                isinstance(item, advisor.OpenAIPdfReadMiddleware)
+                for item in options["middleware"]
+            )
+        )
+        for subagent in options["subagents"]:
+            self.assertTrue(
+                any(
+                    isinstance(item, advisor.OpenAIPdfReadMiddleware)
+                    for item in subagent["middleware"]
+                )
+            )
+
+    def test_pdf_read_is_extracted_by_openai_then_sent_as_text(self) -> None:
+        """Only the PDF is sent to OpenAI; the downstream model gets extracted text."""
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return None
+
+            def read(self):
+                return json.dumps(
+                    {"output_text": "Applicant name: Ada. Page 2."}
+                ).encode()
+
+        def fake_urlopen(request, timeout):
+            self.assertEqual(request.full_url, advisor.OPENAI_RESPONSES_URL)
+            self.assertEqual(timeout, 90)
+            body = json.loads(request.data.decode())
+            self.assertEqual(body["model"], "test-pdf-model")
+            self.assertFalse(body["store"])
+            file_part = body["input"][0]["content"][0]
+            self.assertEqual(file_part["filename"], "transcript.pdf")
+            self.assertTrue(
+                file_part["file_data"].startswith("data:application/pdf;base64,")
+            )
+            return FakeResponse()
+
+        request = ModelRequest(
+            model=object(),  # type: ignore[arg-type]
+            messages=[
+                HumanMessage(content="Find my applicant name in the transcript."),
+                ToolMessage(
+                    content_blocks=[
+                        {
+                            "type": "file",
+                            "mime_type": "application/pdf",
+                            "base64": "JVBERi0=",
+                        }
+                    ],
+                    name="read_file",
+                    tool_call_id="read-pdf",
+                    additional_kwargs={
+                        "read_file_media_type": "application/pdf",
+                        "read_file_path": "/memory/transcript.pdf",
+                    },
+                ),
+            ],
+        )
+        with (
+            patch.dict(
+                os.environ,
+                {"OPENAI_API_KEY": "test-key", "OPENAI_PDF_MODEL": "test-pdf-model"},
+            ),
+            patch.object(advisor, "urlopen", side_effect=fake_urlopen) as openai_call,
+        ):
+            middleware = advisor.OpenAIPdfReadMiddleware()
+            transformed = middleware.wrap_model_call(request, lambda updated: updated)
+
+        openai_call.assert_called_once()
+        pdf_message = transformed.messages[-1]
+        self.assertIsInstance(pdf_message, ToolMessage)
+        self.assertEqual(pdf_message.content_blocks[0]["type"], "text")
+        self.assertIn("Applicant name: Ada", pdf_message.text)
+
+    def test_non_pdf_messages_do_not_call_openai(self) -> None:
+        """The PDF fallback leaves non-PDF tool results untouched."""
+        request = ModelRequest(
+            model=object(),  # type: ignore[arg-type]
+            messages=[
+                ToolMessage(
+                    content="ordinary text", name="read_file", tool_call_id="read-text"
+                )
+            ],
+        )
+        with patch.object(advisor, "urlopen") as openai_call:
+            transformed = advisor.OpenAIPdfReadMiddleware().wrap_model_call(
+                request, lambda updated: updated
+            )
+
+        openai_call.assert_not_called()
+        self.assertEqual(transformed.messages, request.messages)
+
+    def test_pdf_without_openai_key_is_replaced_with_explanation(self) -> None:
+        """Without a key, the PDF is not forwarded as an invalid DeepSeek file block."""
+        request = ModelRequest(
+            model=object(),  # type: ignore[arg-type]
+            messages=[
+                ToolMessage(
+                    content_blocks=[
+                        {
+                            "type": "file",
+                            "mime_type": "application/pdf",
+                            "base64": "JVBERi0=",
+                        }
+                    ],
+                    name="read_file",
+                    tool_call_id="read-pdf",
+                    additional_kwargs={
+                        "read_file_media_type": "application/pdf",
+                        "read_file_path": "/memory/transcript.pdf",
+                    },
+                )
+            ],
+        )
+        with (
+            patch.dict(os.environ, {"OPENAI_API_KEY": ""}),
+            patch.object(advisor, "urlopen") as openai_call,
+        ):
+            transformed = advisor.OpenAIPdfReadMiddleware().wrap_model_call(
+                request, lambda updated: updated
+            )
+
+        openai_call.assert_not_called()
+        self.assertEqual(transformed.messages[0].content_blocks[0]["type"], "text")
+        self.assertIn("set OPENAI_API_KEY", transformed.messages[0].text)
 
     def test_factory_runs_deepseek_without_search_key(self) -> None:
         """A DeepSeek-only setup should start, just without live web tools."""
@@ -214,7 +357,9 @@ class AdvisorConfigurationTests(unittest.TestCase):
 
         options = create.call_args.kwargs
         self.assertIn("/memory/goals.md", options["memory"])
-        self.assertIn("exactly one clearly labelled `Next step`", options["system_prompt"])
+        self.assertIn(
+            "exactly one clearly labelled `Next step`", options["system_prompt"]
+        )
 
 
 if __name__ == "__main__":
