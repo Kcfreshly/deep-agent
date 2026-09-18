@@ -2,6 +2,18 @@
 
 # Changelog
 
+## [0.3.7](https://github.com/Kcfreshly/deep-agent/compare/langchain-quickjs==0.3.6...langchain-quickjs==0.3.7) (2026-09-18)
+
+
+### Features
+
+* **quickjs:** add hmac check to snapshot bytes ([#5601](https://github.com/Kcfreshly/deep-agent/issues/5601)) ([749b386](https://github.com/Kcfreshly/deep-agent/commit/749b386f97ed7b920acfd5936b01f8c425976d92))
+
+
+### Performance Improvements
+
+* **code,quickjs:** omit middleware trace inputs ([#6015](https://github.com/Kcfreshly/deep-agent/issues/6015)) ([673844d](https://github.com/Kcfreshly/deep-agent/commit/673844d06fe0ee186f2e492c3c0a19ec5facffc2))
+
 ## [0.3.6](https://github.com/langchain-ai/deepagents/compare/langchain-quickjs==0.3.5...langchain-quickjs==0.3.6) (2026-09-03)
 
 ### Features
